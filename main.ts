@@ -12,7 +12,9 @@
 //   3. Renders the promo image (1200x675 PNG) from scratch — gradient, shapes
 //      and an embedded 5x7 bitmap font — and writes it to /output/promo.png.
 //      Every byte is computed from constants in this file, so two runs write
-//      identical bytes.
+//      identical bytes. Before writing anything it renders twice in-process
+//      and byte-compares the two renders, failing loudly if they differ, so
+//      a non-deterministic render can never ship an unverified file.
 //
 // Local run (same as the grader, with stand-ins for /bot and /output):
 //   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
@@ -271,9 +273,16 @@ function main(): void {
     process.exit(1);
   }
 
-  // 3. Render + write all outputs.
+  // 3. Render twice + byte-compare before writing anything: the program's
+  //    whole point is byte-identical output, so a non-deterministic render
+  //    must fail loudly instead of shipping an unverified file.
   mkdirSync(OUTPUT_DIR, { recursive: true });
   const promo = renderPromo();
+  const promoAgain = renderPromo();
+  if (!promo.equals(promoAgain)) {
+    console.error('determinism self-check failed: two renders of the promo image differ');
+    process.exit(1);
+  }
   writeFileSync(join(OUTPUT_DIR, 'promo.png'), promo);
   chmodSync(join(OUTPUT_DIR, 'promo.png'), 0o644);
   writeFileSync(join(OUTPUT_DIR, 'POST_TEXT.txt'), postText + '\n');
